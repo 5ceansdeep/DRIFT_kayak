@@ -33,8 +33,10 @@ export default function OceanWater() {
     const waterNormals = generateNormalMapTexture();
 
     const water = new Water(geometry, {
-      textureWidth: 512,
-      textureHeight: 512,
+      // 반사 텍스처 해상도 — 512는 씬을 매 프레임 그만한 크기로 한 번 더
+      // 그리는 비용. 256이면 그 4분의 1로, 육안 차이는 거의 없음.
+      textureWidth: 256,
+      textureHeight: 256,
       waterNormals,
       sunDirection: new THREE.Vector3(60, 100, 40).normalize(),
       sunColor: 0xffffff,

@@ -246,7 +246,15 @@ class Water extends Mesh {
 		// [DRIFT PATCH] 원본엔 없던 줄 — 밖에서 dispose할 수 있도록 노출.
 		scope._renderTarget = renderTarget;
 
+		// [DRIFT PATCH] 원본엔 없던 부분 — 반사는 씬을 통째로 한 번 더 그리는
+		// 거라 매 프레임 하면 비쌈. 격프레임으로만 갱신하고 그 사이엔 직전
+		// 텍스처를 그대로 씀 — 반사가 살짝 늦게 따라오는 정도라 눈에 잘 안 띔.
+		let frameCount = 0;
+
 		scope.onBeforeRender = function ( renderer, scene, camera ) {
+
+			frameCount++;
+			if ( frameCount % 2 !== 0 ) return;
 
 			mirrorWorldPosition.setFromMatrixPosition( scope.matrixWorld );
 			cameraWorldPosition.setFromMatrixPosition( camera.matrixWorld );
