@@ -18,14 +18,14 @@ export default function SerendipityComet() {
 
   const curve = useMemo(() => {
     const r = (COMET_RADIUS_RANGE.min + COMET_RADIUS_RANGE.max) / 2;
-    // 경계 반지름 r 근방을 도는 불규칙한 폐곡선.
+    // 경계 반지름 r 근방, 수면(y≈0) 위를 도는 불규칙한 폐곡선.
     return new THREE.CatmullRomCurve3(
       [
-        new THREE.Vector3(-r, r * 0.3, r * 0.2),
-        new THREE.Vector3(0, -r * 0.6, r * 0.8),
-        new THREE.Vector3(r * 0.9, r * 0.2, -r * 0.3),
-        new THREE.Vector3(r * 0.2, r * 0.7, -r * 0.7),
-        new THREE.Vector3(-r * 0.8, -r * 0.2, -r * 0.4),
+        new THREE.Vector3(-r, 0.5, r * 0.2),
+        new THREE.Vector3(0, 0.5, r * 0.8),
+        new THREE.Vector3(r * 0.9, 0.5, -r * 0.3),
+        new THREE.Vector3(r * 0.2, 0.5, -r * 0.7),
+        new THREE.Vector3(-r * 0.8, 0.5, -r * 0.4),
       ],
       true
     );

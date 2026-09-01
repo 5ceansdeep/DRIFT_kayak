@@ -6,27 +6,24 @@ interface ExploreState {
   nodes: TrackNode[];
   hoveredTrackId: string | null;
   selectedTrackId: string | null;
-  // 블랙홀 워프: 대척점(안티포드) 존의 노드로 카메라를 급이동시키는 연출.
-  isWarping: boolean;
-  warpTargetId: string | null;
+  // 카약이 지금 떠 있는 장르 구역(가장 가까운 장르 성단). KayakCharacter가
+  // 매 프레임 갱신, HUD의 "Region: xxx" 슬라이드인 표시와 물색 틴트에 사용.
+  currentRegion: string | null;
 
   setNodes: (nodes: TrackNode[]) => void;
   setHoveredTrackId: (id: string | null) => void;
   setSelectedTrackId: (id: string | null) => void;
-  startWarp: (nodeId: string) => void;
-  endWarp: () => void;
+  setCurrentRegion: (region: string | null) => void;
 }
 
 export const useExploreStore = create<ExploreState>((set) => ({
   nodes: [],
   hoveredTrackId: null,
   selectedTrackId: null,
-  isWarping: false,
-  warpTargetId: null,
+  currentRegion: null,
 
   setNodes: (nodes) => set({ nodes }),
   setHoveredTrackId: (id) => set({ hoveredTrackId: id }),
   setSelectedTrackId: (id) => set({ selectedTrackId: id }),
-  startWarp: (nodeId) => set({ isWarping: true, warpTargetId: nodeId }),
-  endWarp: () => set({ isWarping: false, warpTargetId: null }),
+  setCurrentRegion: (region) => set({ currentRegion: region }),
 }));

@@ -8,15 +8,16 @@ import { Billboard } from "@react-three/drei";
 import { useExploreStore } from "@/store/useExploreStore";
 import { iTunesCoverUrl } from "@/lib/itunesImage";
 import { OCEAN } from "@/lib/oceanTheme";
+import { waterPosition } from "@/engine/OceanLayout";
+import { waveHeight } from "@/engine/OceanWaves";
 import type { TrackNode } from "@/types";
 
 const CARD_SIZE = 5;
 const RING_THICKNESS = 0.9; // 부표 프레임(코럴 테두리) 두께
-const HOVER_SCALE = 1.5;
-const SELECT_SCALE = 2.8;
+const HOVER_SCALE = 1.4;
+const SELECT_SCALE = 1.7; // 더 이상 카메라가 줌인하지 않으므로 크게 안 키움
 const SCALE_LAMBDA = 10; // damp 계수 — 클수록 빠르게 반응
-const BOB_SPEED = 1.1;
-const BOB_AMPLITUDE = 0.8; // 물에 뜬 부표처럼 위아래로 살짝 흔들리는 폭
+const SPIN_SPEED = 0.5; // LP판처럼 커버가 제자리에서 도는 속도
 
 // 커버 URL을 three.js 텍스처로 로드하는 훅. drei의 useTexture(Suspense 기반)
 // 대신 직접 로더를 써서, 실패(네트워크 오류·CORS 등)해도 앱 전체가 죽지
@@ -61,9 +62,10 @@ function useCoverTexture(url: string | null): THREE.Texture | null {
 // Billboard로 감싸고, 호버/선택 시 부드럽게 확대되며 잔잔하게 위아래로
 // 흔들린다. 노드마다 텍스처가 달라서(InstancedMesh는 인스턴스별 텍스처를
 // 못 씀) 개별 메시로 렌더링한다 — Explore 후보곡 수(수십 개)에선 문제 없음.
-function TrackCard({ node, bobPhase }: { node: TrackNode; bobPhase: number }) {
+function TrackCard({ node }: { node: TrackNode }) {
   const billboardRef = useRef<THREE.Group>(null!);
   const groupRef = useRef<THREE.Group>(null!);
+  const coverRef = useRef<THREE.Mesh>(null!);
   const scaleRef = useRef(1);
   const [hovered, setHovered] = useState(false);
 
@@ -73,6 +75,7 @@ function TrackCard({ node, bobPhase }: { node: TrackNode; bobPhase: number }) {
 
   const coverUrl = node.coverUrl ? iTunesCoverUrl(node.coverUrl, 200) : null;
   const cover = useCoverTexture(coverUrl);
+  const [wx, wy, wz] = waterPosition(node);
 
   useFrame(({ clock }, delta) => {
     const target = isSelected ? SELECT_SCALE : hovered ? HOVER_SCALE : 1;
@@ -83,8 +86,10 @@ function TrackCard({ node, bobPhase }: { node: TrackNode; bobPhase: number }) {
     }
     groupRef.current?.scale.setScalar(scaleRef.current);
 
-    const bob = Math.sin(clock.getElapsedTime() * BOB_SPEED + bobPhase) * BOB_AMPLITUDE;
-    billboardRef.current?.position.set(node.position3D[0], node.position3D[1] + bob, node.position3D[2]);
+    const t = clock.getElapsedTime();
+    const bob = waveHeight(wx, wz, t) * 0.6; // 부표도 물과 같은 파도 공식을 탄다
+    billboardRef.current?.position.set(wx, wy + bob, wz);
+    if (coverRef.current) coverRef.current.rotation.z += delta * SPIN_SPEED;
   });
 
   const handlePointerOver = (e: ThreeEvent<PointerEvent>) => {
@@ -103,7 +108,7 @@ function TrackCard({ node, bobPhase }: { node: TrackNode; bobPhase: number }) {
   };
 
   return (
-    <Billboard ref={billboardRef} position={node.position3D}>
+    <Billboard ref={billboardRef} position={[wx, wy, wz]}>
       <group
         ref={groupRef}
         onPointerOver={handlePointerOver}
@@ -116,7 +121,7 @@ function TrackCard({ node, bobPhase }: { node: TrackNode; bobPhase: number }) {
           <meshToonMaterial color={OCEAN.coral} />
         </mesh>
         {cover && (
-          <mesh position={[0, 0, 0.05]}>
+          <mesh ref={coverRef} position={[0, 0, 0.05]}>
             <planeGeometry args={[CARD_SIZE, CARD_SIZE]} />
             <meshBasicMaterial map={cover} toneMapped={false} side={THREE.DoubleSide} />
           </mesh>
@@ -129,8 +134,8 @@ function TrackCard({ node, bobPhase }: { node: TrackNode; bobPhase: number }) {
 export default function ExploreStars({ nodes }: { nodes: TrackNode[] }) {
   return (
     <>
-      {nodes.map((node, i) => (
-        <TrackCard key={node.trackId} node={node} bobPhase={i} />
+      {nodes.map((node) => (
+        <TrackCard key={node.trackId} node={node} />
       ))}
     </>
   );

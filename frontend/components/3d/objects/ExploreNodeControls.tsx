@@ -5,6 +5,7 @@ import { Html } from "@react-three/drei";
 import { useExploreStore } from "@/store/useExploreStore";
 import { spatialAudioEngine } from "@/engine/SpatialAudioEngine";
 import { getToken, authHeader } from "@/lib/authClient";
+import { waterPosition } from "@/engine/OceanLayout";
 import type { TrackNode } from "@/types";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001";
@@ -71,12 +72,12 @@ export default function ExploreNodeControls({ node }: { node: TrackNode }) {
   };
 
   return (
-    <Html position={node.position3D} center style={{ pointerEvents: "none" }}>
+    <Html position={waterPosition(node)} center style={{ pointerEvents: "none" }}>
       <div
         className="drift-panel-in pointer-events-auto flex w-56 flex-col items-center gap-2 rounded-2xl border border-[#0d2b3e] bg-[#eef7fa]/90 px-3 py-2 font-mono text-[#0d2b3e] backdrop-blur-sm"
-        // ponytail: 확대된 카드 크기(CARD_SIZE*SELECT_SCALE, ExploreStars.tsx)에 맞춘
+        // ponytail: 부표 카드 크기(CARD_SIZE*SELECT_SCALE, ExploreStars.tsx)에 맞춘
         // 고정 오프셋. 그 값들이 커지면 여기도 같이 늘려야 함 — 동적 계산은 과함.
-        style={{ transform: "translateY(150px)" }}
+        style={{ transform: "translateY(70px)" }}
       >
         <div className="flex w-full items-center gap-2">
           <button

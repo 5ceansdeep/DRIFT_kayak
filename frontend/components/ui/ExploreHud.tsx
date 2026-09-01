@@ -1,48 +1,47 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useExploreStore } from "@/store/useExploreStore";
 import { iTunesCoverUrl } from "@/lib/itunesImage";
-import { zoneForSimilarity } from "@/engine/SimilarityZones";
 
-// 바다 컨셉 HUD — 게임처럼 가볍게. 잉크/좌표계측 톤 대신 항해 은유로:
-//  - 좌하단: "COMPASS" 패널 — 실제 존으로 배를 이동시키는 버튼 3개
-//    (Calm/Open은 fly-to, Storm Edge는 기존 블랙홀 워프 재사용)
-//  - 최하단: 트랙 마퀴 티커 + 조작 힌트 바
+// 카약 컨셉 HUD. 이동은 이제 WASD/방향키로 직접 하므로 클릭식 존 이동
+// 패널(COMPASS)은 뺐고, 조작 힌트만 노 젓기 안내로 바꿨다.
 const BOTTOM_STACK_HEIGHT = 68; // 마퀴(28px) + 힌트바(40px)
+const REGION_TOAST_MS = 2500;
+
+// currentRegion이 바뀔 때만 잠깐 슬라이드인했다가 사라지는 토스트.
+function useRegionToast(region: string | null) {
+  const [visible, setVisible] = useState(false);
+  const prev = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (region && region !== prev.current) {
+      // region prop 변화에 반응해 토스트를 잠깐 띄우는 전형적 패턴이라 동기 setState 의도적으로 씀.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVisible(true);
+      const timer = setTimeout(() => setVisible(false), REGION_TOAST_MS);
+      prev.current = region;
+      return () => clearTimeout(timer);
+    }
+    prev.current = region;
+  }, [region]);
+
+  return visible;
+}
 
 export default function ExploreHud() {
   const nodes = useExploreStore((state) => state.nodes);
   const hoveredTrackId = useExploreStore((state) => state.hoveredTrackId);
   const selectedTrackId = useExploreStore((state) => state.selectedTrackId);
-  const setSelectedTrackId = useExploreStore((state) => state.setSelectedTrackId);
-  const isWarping = useExploreStore((state) => state.isWarping);
-  const startWarp = useExploreStore((state) => state.startWarp);
+  const currentRegion = useExploreStore((state) => state.currentRegion);
+  const showRegionToast = useRegionToast(currentRegion);
 
   // 선택된 곡은 3D 씬 안(ExploreNodeControls)이 카드 바로 아래에 컨트롤을
   // 붙여서 담당 — 여기선 hover만 가볍게 표시.
   const hoveredNode = selectedTrackId
     ? undefined
     : nodes.find((n) => n.trackId === hoveredTrackId);
-
-  const focusZone = (zone: "HIGH" | "MID") => {
-    if (nodes.length === 0) return;
-    const candidates = nodes.filter((n) => zoneForSimilarity(n.similarity) === zone);
-    if (candidates.length === 0) return;
-    const pick = candidates[Math.floor(Math.random() * candidates.length)];
-    setSelectedTrackId(pick.trackId);
-  };
-
-  const handleWarp = () => {
-    if (nodes.length === 0) return;
-    // 절대 임계값(-0.7) 대신 "가장 유사도가 낮은 쪽 10%"에서 뽑는다 — mock 데이터는
-    // -1~1 범위라 절대 임계값도 맞지만, 실 데이터(코사인 유사도, 태그가 전부
-    // 0 이상 가중치라 사실상 0~1 범위)엔 음수가 거의 없어 대척점이 안 잡힌다.
-    const sorted = [...nodes].sort((a, b) => a.similarity - b.similarity);
-    const pool = sorted.slice(0, Math.max(1, Math.ceil(sorted.length * 0.1)));
-    const target = pool[Math.floor(Math.random() * pool.length)];
-    startWarp(target.trackId);
-  };
 
   const marqueeText =
     nodes.length > 0 ? nodes.map((n) => `${n.title} — ${n.artist}`).join(" · ") : "SCANNING···";
@@ -59,34 +58,11 @@ export default function ExploreHud() {
         <div className="opacity-40">{nodes.length > 0 ? nodes.length : "···"}</div>
       </div>
 
-      {/* 좌하단: COMPASS 패널 — 존 이동 (하단 마퀴+힌트 바 위로 띄움) */}
-      <div
-        className="pointer-events-auto absolute left-4 w-[190px] rounded-2xl border border-[#0d2b3e] bg-[#eef7fa]/90 px-4 py-3"
-        style={{ bottom: BOTTOM_STACK_HEIGHT + 16 }}
-      >
-        <div className="mb-2 text-[7px] tracking-[0.12em] opacity-60">COMPASS</div>
-        <button
-          onClick={() => focusZone("HIGH")}
-          className="block w-full py-1.5 text-left text-[10px] tracking-[0.06em] opacity-70 transition-opacity hover:opacity-100"
-        >
-          ⛵ Calm Waters
-        </button>
-        <button
-          onClick={() => focusZone("MID")}
-          className="block w-full py-1.5 text-left text-[10px] tracking-[0.06em] opacity-70 transition-opacity hover:opacity-100"
-        >
-          🌊 Open Sea
-        </button>
-        <button
-          onClick={handleWarp}
-          disabled={isWarping}
-          className={`block w-full rounded-full py-1.5 text-left text-[10px] tracking-[0.06em] transition-colors ${
-            isWarping ? "bg-[#0d2b3e] pl-2 text-[#eef7fa]" : "opacity-70 hover:opacity-100"
-          }`}
-        >
-          ⛈️ Storm Edge{isWarping ? " ···" : ""}
-        </button>
-      </div>
+      {showRegionToast && currentRegion && (
+        <div className="drift-panel-in pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-[#0d2b3e] bg-[#eef7fa]/90 px-4 py-1.5 text-[11px] tracking-[0.08em]">
+          Region: <span className="font-bold">{currentRegion}</span>
+        </div>
+      )}
 
       {hoveredNode && (
         <div
@@ -119,10 +95,10 @@ export default function ExploreHud() {
       </div>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex h-10 items-center gap-5 border-t border-[#0d2b3e]/40 bg-[#eef7fa] px-4 text-[11px] tracking-[0.06em] opacity-70">
         <span>
-          <span className="mr-1 rounded-full border border-[#0d2b3e]/40 px-1 text-[9px]">DRAG</span>Steer
+          <span className="mr-1 rounded-full border border-[#0d2b3e]/40 px-1 text-[9px]">W A S D</span>Paddle
         </span>
         <span>
-          <span className="mr-1 rounded-full border border-[#0d2b3e]/40 px-1 text-[9px]">SCROLL</span>Zoom
+          <span className="mr-1 rounded-full border border-[#0d2b3e]/40 px-1 text-[9px]">↑↓←→</span>도 가능
         </span>
         <span>
           <span className="mr-1 rounded-full border border-[#0d2b3e]/40 px-1 text-[9px]">CLICK</span>Board
