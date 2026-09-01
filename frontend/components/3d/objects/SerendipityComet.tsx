@@ -5,14 +5,12 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useExploreStore } from "@/store/useExploreStore";
 import { COMET_RADIUS_RANGE } from "@/engine/SimilarityZones";
+import { OCEAN } from "@/lib/oceanTheme";
 
-const INK = "#0a0f0c";
-const TRAIL_LAG = 0.015; // 꼬리가 머리보다 이만큼 뒤처진 위치를 따라간다
+const TRAIL_LAG = 0.015; // 물결(꼬리)이 병보다 이만큼 뒤처진 위치를 따라간다
 
-// 0.3~0.5 유사도 경계(필터 버블의 가장자리)를 순찰하는 세렌디피티 혜성.
-// 클릭하면 그 경계 구간에서 무작위 트랙 하나를 "포착"해 선택 상태로 만든다.
-// 연구소 컨셉: 빛나는 후광 대신, 참고 HTML의 궤도 표지처럼 얇은 와이어프레임
-// 정팔면체 + 짧은 꼬리선 하나만 남긴다 — 계측기가 궤적을 추적하는 인상.
+// 0.3~0.5 유사도 경계(필터 버블의 가장자리)를 떠도는 유리병(세렌디피티).
+// 클릭하면 그 경계 구간에서 무작위 트랙 하나를 "건져 올려" 선택 상태로 만든다.
 export default function SerendipityComet() {
   const meshRef = useRef<THREE.Mesh>(null!);
   const nodes = useExploreStore((state) => state.nodes);
@@ -38,7 +36,7 @@ export default function SerendipityComet() {
   const trailLine = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(6), 3));
-    const mat = new THREE.LineBasicMaterial({ color: INK, transparent: true, opacity: 0.35 });
+    const mat = new THREE.LineBasicMaterial({ color: OCEAN.teal, transparent: true, opacity: 0.4 });
     const line = new THREE.Line(g, mat);
     line.raycast = () => {};
     return line;
@@ -88,8 +86,8 @@ export default function SerendipityComet() {
       {/* 꼬리선 — 클릭 대상 아님, 순수 장식 */}
       <primitive object={trailLine} />
       <mesh ref={meshRef} onClick={handleClick}>
-        <octahedronGeometry args={[1.6, 0]} />
-        <meshBasicMaterial color={INK} wireframe />
+        <capsuleGeometry args={[0.9, 2.2, 4, 8]} />
+        <meshToonMaterial color="#9fd8c9" transparent opacity={0.85} />
       </mesh>
     </>
   );

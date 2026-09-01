@@ -6,6 +6,7 @@ import { Grid, Html } from "@react-three/drei";
 import { useExploreStore } from "@/store/useExploreStore";
 import { prefetchCovers } from "@/lib/itunesImage";
 import { authHeader } from "@/lib/authClient";
+import { OCEAN } from "@/lib/oceanTheme";
 import ExploreStars from "../objects/ExploreStars";
 import ExploreNodeControls from "../objects/ExploreNodeControls";
 import SimilarityZoneShells from "../objects/SimilarityZoneShells";
@@ -45,6 +46,28 @@ function useSelfLinkGeometry(nodes: TrackNode[]) {
   }, [nodes]);
 }
 
+// 장르별 무게중심 — "각 해변마다 다른 장르" 라벨을 붙일 위치.
+// /api/explore가 같은 장르를 같은 방향으로 몰아 배치해주므로(genreClusterDirection)
+// 여기선 평균만 내면 자연스럽게 그 성단 한가운데가 나온다.
+function useGenreCentroids(nodes: TrackNode[]) {
+  return useMemo(() => {
+    const groups = new Map<string, [number, number, number][]>();
+    nodes.forEach((n) => {
+      const list = groups.get(n.genre) ?? [];
+      list.push(n.position3D);
+      groups.set(n.genre, list);
+    });
+    return Array.from(groups.entries()).map(([genre, positions]) => {
+      const sum = positions.reduce(
+        (acc, [x, y, z]) => [acc[0] + x, acc[1] + y, acc[2] + z] as [number, number, number],
+        [0, 0, 0] as [number, number, number]
+      );
+      const n = positions.length;
+      return { genre, position: [sum[0] / n, sum[1] / n, sum[2] / n] as [number, number, number] };
+    });
+  }, [nodes]);
+}
+
 export default function ExploreScene() {
   const setNodes = useExploreStore((state) => state.setNodes);
   const nodeCount = useExploreStore((state) => state.nodes.length);
@@ -54,6 +77,7 @@ export default function ExploreScene() {
 
   const stemGeometry = useStemGeometry(nodes);
   const selfLinkGeometry = useSelfLinkGeometry(nodes);
+  const genreCentroids = useGenreCentroids(nodes);
 
   useEffect(() => {
     if (nodeCount > 0) return;
@@ -68,14 +92,13 @@ export default function ExploreScene() {
 
   return (
     <>
-      {/* 연구소 컨셉: 실험실 작업대의 그래프 용지 같은 기준 격자.
-          원점(=내 라이브러리, 유사도 1.0 지점)과 같은 높이에 깔아, 격자가
-          "해수면" 기준선처럼 노드 구름을 가로지르게 한다. */}
+      {/* 바다 컨셉: 해수면 기준 격자. 원점(=내 라이브러리, 유사도 1.0 지점)과
+          같은 높이에 깔아, 노드 구름을 가로지르는 "수면"처럼 보이게 한다. */}
       <Grid
         args={[500, 500]}
         position={[0, FLOOR_Y, 0]}
-        cellColor="#7aaa8a"
-        sectionColor="#5a7060"
+        cellColor={OCEAN.water}
+        sectionColor={OCEAN.teal}
         cellThickness={0.4}
         sectionThickness={0.7}
         cellSize={10}
@@ -86,31 +109,43 @@ export default function ExploreScene() {
         followCamera={false}
       />
 
-      {/* 노드 → 바닥 지시선 */}
+      {/* 노드 → 수면 지시선 */}
       <lineSegments raycast={() => null}>
         <primitive object={stemGeometry} attach="geometry" />
-        <lineBasicMaterial color="#5a7060" transparent opacity={0.35} />
+        <lineBasicMaterial color={OCEAN.teal} transparent opacity={0.35} />
       </lineSegments>
 
-      {/* 원점 → 상위 유사도 곡 연결선 */}
+      {/* 원점 → 상위 유사도 곡 연결선(항로) */}
       <lineSegments raycast={() => null}>
         <primitive object={selfLinkGeometry} attach="geometry" />
-        <lineBasicMaterial color="#0a0f0c" transparent opacity={0.22} />
+        <lineBasicMaterial color={OCEAN.coral} transparent opacity={0.3} />
       </lineSegments>
+
+      {/* 장르별 성단 라벨 — 해변/구역 이름표 */}
+      {genreCentroids.map(({ genre, position }) => (
+        <Html key={genre} position={position} center style={{ pointerEvents: "none" }}>
+          <div className="whitespace-nowrap rounded-full border border-[#0d2b3e] bg-white/70 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-[#0d2b3e] opacity-70">
+            {genre}
+          </div>
+        </Html>
+      ))}
 
       <SimilarityZoneShells />
 
-      {/* MY LIBRARY 앵커 — radiusForSimilarity(1) = 0, 즉 원점이 "나와 100%
-          같은 지점"이라 여기가 곧 자기 자신의 위치다. 참고 이미지처럼 채워진
-          큐브로 바닥 위에 두드러지게 표시. */}
-      <group>
-        <mesh raycast={() => null} position={[0, FLOOR_Y, 0]}>
-          <boxGeometry args={[5, 5, 5]} />
-          <meshBasicMaterial color="#0a0f0c" />
+      {/* YOUR SHIP 앵커 — radiusForSimilarity(1) = 0, 즉 원점이 "나와 100%
+          같은 지점"이라 여기가 곧 자기 자신의 위치다. 배 모양(선체+돛)으로 표시. */}
+      <group position={[0, FLOOR_Y, 0]} raycast={() => null}>
+        <mesh position={[0, 0.6, 0]}>
+          <boxGeometry args={[6, 1.6, 3]} />
+          <meshToonMaterial color={OCEAN.ship} />
         </mesh>
-        <Html position={[0, FLOOR_Y - 4.5, 0]} center style={{ pointerEvents: "none" }}>
-          <div className="whitespace-nowrap border-b border-ink3 pb-px font-mono text-[9px] uppercase tracking-[0.18em] text-ink3 opacity-60">
-            My Library
+        <mesh position={[0, 3, 0]}>
+          <coneGeometry args={[2.2, 4.5, 4]} />
+          <meshToonMaterial color="#ffffff" />
+        </mesh>
+        <Html position={[0, -3, 0]} center style={{ pointerEvents: "none" }}>
+          <div className="whitespace-nowrap rounded-full border border-[#0d2b3e] bg-white/70 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-[#0d2b3e] opacity-70">
+            Your Ship
           </div>
         </Html>
       </group>

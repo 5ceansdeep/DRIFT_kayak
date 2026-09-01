@@ -6,6 +6,7 @@ import type { Mesh, MeshBasicMaterial } from "three";
 import { Html } from "@react-three/drei";
 import { useExploreStore } from "@/store/useExploreStore";
 import { ZONE_BOUNDARY_RADII, MAX_RADIUS, zoneForSimilarity } from "@/engine/SimilarityZones";
+import { OCEAN } from "@/lib/oceanTheme";
 
 const IDLE_OPACITY = 0.035;
 const ACTIVE_OPACITY = 0.16;
@@ -56,16 +57,16 @@ export default function SimilarityZoneShells() {
     <group>
       <mesh ref={highMidRef} raycast={() => null}>
         <sphereGeometry args={[ZONE_BOUNDARY_RADII.highMid, 24, 16]} />
-        <meshBasicMaterial color="#0a0f0c" wireframe transparent opacity={IDLE_OPACITY} />
+        <meshBasicMaterial color={OCEAN.teal} wireframe transparent opacity={IDLE_OPACITY} />
       </mesh>
       <mesh ref={midLowRef} raycast={() => null}>
         <sphereGeometry args={[ZONE_BOUNDARY_RADII.midLow, 24, 16]} />
-        <meshBasicMaterial color="#0a0f0c" wireframe transparent opacity={IDLE_OPACITY} />
+        <meshBasicMaterial color={OCEAN.teal} wireframe transparent opacity={IDLE_OPACITY} />
       </mesh>
 
       <Html position={[0, ZONE_BOUNDARY_RADII.highMid * 0.5, 0]} center style={{ pointerEvents: "none" }}>
-        <div className="whitespace-nowrap border-b border-ink3 pb-px font-mono text-[9px] uppercase tracking-[0.18em] text-ink3 opacity-60">
-          High Similarity
+        <div className="whitespace-nowrap border-b border-[#0d2b3e] pb-px font-mono text-[9px] uppercase tracking-[0.18em] text-[#0d2b3e] opacity-60">
+          Calm Waters
         </div>
       </Html>
       <Html
@@ -73,13 +74,13 @@ export default function SimilarityZoneShells() {
         center
         style={{ pointerEvents: "none" }}
       >
-        <div className="whitespace-nowrap border-b border-ink3 pb-px font-mono text-[9px] uppercase tracking-[0.18em] text-ink3 opacity-60">
-          Serendipity Boundary
+        <div className="whitespace-nowrap border-b border-[#0d2b3e] pb-px font-mono text-[9px] uppercase tracking-[0.18em] text-[#0d2b3e] opacity-60">
+          Open Sea
         </div>
       </Html>
       <Html position={[0, MAX_RADIUS * 0.92, 0]} center style={{ pointerEvents: "none" }}>
-        <div className="whitespace-nowrap border-b border-ink3 pb-px font-mono text-[9px] uppercase tracking-[0.18em] text-ink3 opacity-60">
-          Antipode · Warp Zone
+        <div className="whitespace-nowrap border-b border-[#0d2b3e] pb-px font-mono text-[9px] uppercase tracking-[0.18em] text-[#0d2b3e] opacity-60">
+          Storm Edge
         </div>
       </Html>
     </group>

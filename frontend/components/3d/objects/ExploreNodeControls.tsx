@@ -73,7 +73,7 @@ export default function ExploreNodeControls({ node }: { node: TrackNode }) {
   return (
     <Html position={node.position3D} center style={{ pointerEvents: "none" }}>
       <div
-        className="drift-panel-in pointer-events-auto flex w-56 flex-col items-center gap-2 border border-black bg-paper/90 px-3 py-2 font-mono text-black backdrop-blur-sm"
+        className="drift-panel-in pointer-events-auto flex w-56 flex-col items-center gap-2 rounded-2xl border border-[#0d2b3e] bg-[#eef7fa]/90 px-3 py-2 font-mono text-[#0d2b3e] backdrop-blur-sm"
         // ponytail: 확대된 카드 크기(CARD_SIZE*SELECT_SCALE, ExploreStars.tsx)에 맞춘
         // 고정 오프셋. 그 값들이 커지면 여기도 같이 늘려야 함 — 동적 계산은 과함.
         style={{ transform: "translateY(150px)" }}
@@ -81,16 +81,16 @@ export default function ExploreNodeControls({ node }: { node: TrackNode }) {
         <div className="flex w-full items-center gap-2">
           <button
             onClick={() => spatialAudioEngine.togglePlay(trackId)}
-            className="flex h-6 w-6 shrink-0 items-center justify-center border border-black text-[10px]"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#0d2b3e] text-[10px]"
           >
             {playback.paused ? "▶" : "❚❚"}
           </button>
           <div
             ref={barRef}
             onClick={handleSeek}
-            className="relative h-1 flex-1 cursor-pointer bg-black/15"
+            className="relative h-1 flex-1 cursor-pointer rounded-full bg-[#0d2b3e]/15"
           >
-            <div className="absolute inset-y-0 left-0 bg-black" style={{ width: `${progress * 100}%` }} />
+            <div className="absolute inset-y-0 left-0 rounded-full bg-[#ff8a65]" style={{ width: `${progress * 100}%` }} />
           </div>
           <div className="w-14 shrink-0 text-right text-[9px] opacity-50">
             {formatTime(playback.currentTime)} / {formatTime(playback.duration)}
@@ -102,14 +102,14 @@ export default function ExploreNodeControls({ node }: { node: TrackNode }) {
             <button
               onClick={handleArchive}
               disabled={archiving || archived}
-              className="flex-1 border border-black py-1 text-[9px] tracking-[0.06em] disabled:opacity-50"
+              className="flex-1 rounded-full border border-[#0d2b3e] py-1 text-[9px] tracking-[0.06em] disabled:opacity-50"
             >
               {archived ? "✓ ARCHIVED" : archiving ? "···" : "+ ARCHIVE"}
             </button>
           )}
           <button
             onClick={() => setSelectedTrackId(null)}
-            className="border border-black px-2 py-1 text-[9px] opacity-60 hover:opacity-100"
+            className="rounded-full border border-[#0d2b3e] px-2 py-1 text-[9px] opacity-60 hover:opacity-100"
           >
             ✕
           </button>

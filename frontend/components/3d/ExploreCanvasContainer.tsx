@@ -8,8 +8,7 @@ import TacticalEffects from "./postprocessing/TacticalEffects";
 import AudioController from "./AudioController";
 import { useExploreStore } from "@/store/useExploreStore";
 import ExploreHud from "../ui/ExploreHud";
-import AtmosphereFX from "../ui/AtmosphereFX";
-import { DRIFT_PAPER_HEX } from "@/lib/driftTheme";
+import { OCEAN } from "@/lib/oceanTheme";
 
 const FOCUS_DISTANCE = 18;
 const WARP_TRANSITION_MS = 1300; // CameraControls smoothTime(0.9~1.2s)에 맞춘 여유값
@@ -58,8 +57,10 @@ export default function ExploreCanvasContainer() {
   }, [isWarping, warpTargetId, nodes, endWarp]);
 
   return (
-    <div className="relative h-full w-full">
-      <AtmosphereFX />
+    <div
+      className="relative h-full w-full"
+      style={{ background: `linear-gradient(180deg, ${OCEAN.skyTop}, ${OCEAN.skyBottom})` }}
+    >
       <ExploreHud />
 
       <Canvas
@@ -68,8 +69,7 @@ export default function ExploreCanvasContainer() {
         // 등각(isometric) 느낌 — 원근 소실점 없이 격자가 평행한 다이아몬드로
         // 보이도록 직교 카메라를 대각선 위치에서 시작시킨다.
         camera={{ position: [110, 85, 110], zoom: 4, near: 0.1, far: 2000 }}
-        gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
-        onCreated={({ gl }) => gl.setClearColor(DRIFT_PAPER_HEX)}
+        gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       >
         <CameraControls
           ref={controlsRef}
@@ -84,7 +84,10 @@ export default function ExploreCanvasContainer() {
           draggingSmoothTime={0.6}
           restThreshold={0.005}
         />
-        <ambientLight intensity={0.8} />
+        {/* 고무찰흙 느낌의 카툰 셰이딩(meshToonMaterial)엔 방향광이 있어야
+            음영 단이 생긴다 — 잉크 컨셉 때(meshBasicMaterial) 없던 조명. */}
+        <ambientLight intensity={0.9} />
+        <directionalLight position={[60, 100, 40]} intensity={0.8} />
         <AudioController selectedTrackId={selectedTrackId} nodes={nodes} />
         <ExploreScene />
         <TacticalEffects />

@@ -5,12 +5,9 @@ import { useExploreStore } from "@/store/useExploreStore";
 import { iTunesCoverUrl } from "@/lib/itunesImage";
 import { zoneForSimilarity } from "@/engine/SimilarityZones";
 
-// 연구소 컨셉 HUD. 참고 이미지의 레이아웃(하단에 쌓인 마퀴+힌트 바, 좌하단
-// "Filter Mode" 패널, 우상단 좌표 판독값)을 DRIFT의 실제 코사인 유사도
-// 기반 3D 배치에 맞춰 재해석했다.
-//  - 우상단: 호버한 노드의 좌표 계측 판독값
-//  - 좌하단: "Filter Mode" 패널 — 장식적 토글이 아니라 실제 존으로
-//    카메라를 이동시키는 버튼 3개 (Similar/New는 fly-to, Edge는 기존 블랙홀 워프 재사용)
+// 바다 컨셉 HUD — 게임처럼 가볍게. 잉크/좌표계측 톤 대신 항해 은유로:
+//  - 좌하단: "COMPASS" 패널 — 실제 존으로 배를 이동시키는 버튼 3개
+//    (Calm/Open은 fly-to, Storm Edge는 기존 블랙홀 워프 재사용)
 //  - 최하단: 트랙 마퀴 티커 + 조작 힌트 바
 const BOTTOM_STACK_HEIGHT = 68; // 마퀴(28px) + 힌트바(40px)
 
@@ -51,7 +48,7 @@ export default function ExploreHud() {
     nodes.length > 0 ? nodes.map((n) => `${n.title} — ${n.artist}`).join(" · ") : "SCANNING···";
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-10 font-mono text-black">
+    <div className="pointer-events-none absolute inset-0 z-10 font-mono text-[#0d2b3e]">
       <div className="pointer-events-auto absolute left-4 top-4 flex flex-col gap-1 text-[11px]">
         <Link href="/galaxy" className="w-fit opacity-60 hover:opacity-100">
           ← GALAXY
@@ -62,51 +59,38 @@ export default function ExploreHud() {
         <div className="opacity-40">{nodes.length > 0 ? nodes.length : "···"}</div>
       </div>
 
-      {/* 좌표 계측 판독값 */}
-      <div className="pointer-events-none absolute right-4 top-4 text-right text-[11px] leading-relaxed tracking-[0.1em] text-ink3">
-        <div>
-          X <span className="text-ink2">{hoveredNode ? hoveredNode.position3D[0].toFixed(1) : "—"}</span>
-        </div>
-        <div>
-          Y <span className="text-ink2">{hoveredNode ? hoveredNode.position3D[1].toFixed(1) : "—"}</span>
-        </div>
-        <div>
-          Z <span className="text-ink2">{hoveredNode ? hoveredNode.position3D[2].toFixed(1) : "—"}</span>
-        </div>
-      </div>
-
-      {/* 좌하단: Filter Mode 패널 — 존 이동 (하단 마퀴+힌트 바 위로 띄움) */}
+      {/* 좌하단: COMPASS 패널 — 존 이동 (하단 마퀴+힌트 바 위로 띄움) */}
       <div
-        className="pointer-events-auto absolute left-4 w-[190px] border border-black bg-paper px-4 py-3"
+        className="pointer-events-auto absolute left-4 w-[190px] rounded-2xl border border-[#0d2b3e] bg-[#eef7fa]/90 px-4 py-3"
         style={{ bottom: BOTTOM_STACK_HEIGHT + 16 }}
       >
-        <div className="mb-2 text-[7px] tracking-[0.12em] text-ink3">FILTER MODE</div>
+        <div className="mb-2 text-[7px] tracking-[0.12em] opacity-60">COMPASS</div>
         <button
           onClick={() => focusZone("HIGH")}
-          className="block w-full border-t border-transparent py-1.5 text-left text-[10px] tracking-[0.06em] text-ink3 transition-colors hover:text-ink"
+          className="block w-full py-1.5 text-left text-[10px] tracking-[0.06em] opacity-70 transition-opacity hover:opacity-100"
         >
-          01 · Similar Vibe
+          ⛵ Calm Waters
         </button>
         <button
           onClick={() => focusZone("MID")}
-          className="block w-full border-t border-transparent py-1.5 text-left text-[10px] tracking-[0.06em] text-ink3 transition-colors hover:text-ink"
+          className="block w-full py-1.5 text-left text-[10px] tracking-[0.06em] opacity-70 transition-opacity hover:opacity-100"
         >
-          02 · New Territory
+          🌊 Open Sea
         </button>
         <button
           onClick={handleWarp}
           disabled={isWarping}
-          className={`block w-full py-1.5 text-left text-[10px] tracking-[0.06em] transition-colors ${
-            isWarping ? "bg-black pl-2 text-paper" : "text-ink3 hover:text-ink"
+          className={`block w-full rounded-full py-1.5 text-left text-[10px] tracking-[0.06em] transition-colors ${
+            isWarping ? "bg-[#0d2b3e] pl-2 text-[#eef7fa]" : "opacity-70 hover:opacity-100"
           }`}
         >
-          03 · Edge Cases{isWarping ? " ···" : ""}
+          ⛈️ Storm Edge{isWarping ? " ···" : ""}
         </button>
       </div>
 
       {hoveredNode && (
         <div
-          className="drift-panel-in pointer-events-none absolute right-4 flex max-w-xs items-center gap-2 border border-black bg-paper/90 px-3 py-2 text-[11px]"
+          className="drift-panel-in pointer-events-none absolute right-4 flex max-w-xs items-center gap-2 rounded-2xl border border-[#0d2b3e] bg-[#eef7fa]/90 px-3 py-2 text-[11px]"
           style={{ bottom: BOTTOM_STACK_HEIGHT + 16 }}
         >
           {hoveredNode.coverUrl && (
@@ -115,7 +99,7 @@ export default function ExploreHud() {
               src={iTunesCoverUrl(hoveredNode.coverUrl, 80)!}
               alt=""
               decoding="async"
-              className="h-10 w-10 border border-black object-cover"
+              className="h-10 w-10 rounded-full border border-[#0d2b3e] object-cover"
             />
           )}
           <div>
@@ -127,21 +111,21 @@ export default function ExploreHud() {
       )}
 
       {/* 최하단 스택: 마퀴 티커 + 조작 힌트 바 */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-10 z-10 flex h-7 items-center overflow-hidden border-y border-black bg-paper text-[10px] tracking-[0.16em] text-ink3">
+      <div className="pointer-events-none absolute inset-x-0 bottom-10 z-10 flex h-7 items-center overflow-hidden border-y border-[#0d2b3e]/40 bg-[#eef7fa] text-[10px] tracking-[0.16em] opacity-70">
         <div className="drift-marquee-track">
           <span className="mx-[18px]">{marqueeText}</span>
           <span className="mx-[18px]">{marqueeText}</span>
         </div>
       </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex h-10 items-center gap-5 border-t border-black bg-paper px-4 text-[11px] tracking-[0.06em] text-ink3">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex h-10 items-center gap-5 border-t border-[#0d2b3e]/40 bg-[#eef7fa] px-4 text-[11px] tracking-[0.06em] opacity-70">
         <span>
-          <span className="mr-1 border border-ink3 px-1 text-[9px] text-ink2">DRAG</span>Orbit
+          <span className="mr-1 rounded-full border border-[#0d2b3e]/40 px-1 text-[9px]">DRAG</span>Steer
         </span>
         <span>
-          <span className="mr-1 border border-ink3 px-1 text-[9px] text-ink2">SCROLL</span>Zoom
+          <span className="mr-1 rounded-full border border-[#0d2b3e]/40 px-1 text-[9px]">SCROLL</span>Zoom
         </span>
         <span>
-          <span className="mr-1 border border-ink3 px-1 text-[9px] text-ink2">CLICK</span>Select
+          <span className="mr-1 rounded-full border border-[#0d2b3e]/40 px-1 text-[9px]">CLICK</span>Board
         </span>
       </div>
     </div>
