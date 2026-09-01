@@ -44,12 +44,33 @@ export default function KayakCharacter() {
   const waterLayout = useExploreStore((s) => s.waterLayout);
   const setSelectedTrackId = useExploreStore((s) => s.setSelectedTrackId);
   const setCurrentRegion = useExploreStore((s) => s.setCurrentRegion);
+  const setNearbyTrackIds = useExploreStore((s) => s.setNearbyTrackIds);
+  const setNextBuoyScreenAngle = useExploreStore((s) => s.setNextBuoyScreenAngle);
+  const devMode = useExploreStore((s) => s.devMode);
+  const toggleDevMode = useExploreStore((s) => s.toggleDevMode);
   const nearby = useRef<Set<string>>(new Set());
+  const tmpKayakNDC = useRef(new THREE.Vector3());
+  const tmpTargetNDC = useRef(new THREE.Vector3());
   const centroids = useMemo(() => genreCentroids(nodes, waterLayout), [nodes, waterLayout]);
   // 점토 표면의 "지문/뭉툭함" 느낌을 내는 범프 노멀맵 — 물결용과 같은 생성기,
   // 돌기를 더 작고 촘촘하게. 리마운트 때마다 새로 생기니 언마운트 시 dispose.
   const clayNormal = useMemo(() => generateNormalMapTexture(128, 50, 3, 8, 0.35), []);
   useEffect(() => () => clayNormal.dispose(), [clayNormal]);
+
+  // M: 개발자 모드(전체 지역 조망용 자유 궤도 카메라) 토글.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "KeyM") toggleDevMode();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [toggleDevMode]);
+
+  // 켜지는 순간 한 번 전체가 내려다보이는 위치로 점프 — 이후는 OrbitControls(ExploreScene)가 맡는다.
+  // y축 바로 위(0,h,0)로 두면 lookAt이 up벡터와 겹쳐 흔들리므로 z를 살짝 줌.
+  useEffect(() => {
+    if (devMode) camera.position.set(0, 650, 300);
+  }, [devMode, camera]);
 
   useFrame(({ clock }, delta) => {
     const group = groupRef.current;
@@ -74,7 +95,8 @@ export default function KayakCharacter() {
 
     // ── 자세(파도에 뜬 느낌)는 12~15fps로만 갱신 — 고무찰흙 스톱모션 미학 ──
     animAcc.current += delta;
-    if (animAcc.current >= 1 / ANIM_FPS) {
+    const throttledTick = animAcc.current >= 1 / ANIM_FPS;
+    if (throttledTick) {
       animAcc.current = 0;
       const gx = group.position.x;
       const gz = group.position.z;
@@ -91,9 +113,11 @@ export default function KayakCharacter() {
       }
     }
 
-    // ── 3인칭 추격 카메라 (부드럽게, 매 프레임) ──
-    camera.position.lerp(group.position.clone().add(CAMERA_OFFSET), Math.min(1, CAMERA_LERP * delta));
-    camera.lookAt(group.position.x, group.position.y + 2, group.position.z);
+    // ── 3인칭 추격 카메라 (부드럽게, 매 프레임) — 개발자 모드에선 OrbitControls가 대신 소유 ──
+    if (!devMode) {
+      camera.position.lerp(group.position.clone().add(CAMERA_OFFSET), Math.min(1, CAMERA_LERP * delta));
+      camera.lookAt(group.position.x, group.position.y + 2, group.position.z);
+    }
 
     // ── 지금 있는 장르 구역 갱신 ──
     setCurrentRegion(nearestGenre(group.position.x, group.position.z, centroids));
@@ -102,12 +126,15 @@ export default function KayakCharacter() {
     spatialAudioEngine.updateListenerPosition([group.position.x, group.position.y, group.position.z]);
     let nearestId: string | null = null;
     let nearestDist = Infinity;
+    let nearestPos: [number, number, number] | null = null;
+    let nearbyChanged = false;
     nodes.forEach((n) => {
       const [nx, ny, nz] = waterLayout.get(n.trackId) ?? waterPosition(n);
       const dist = Math.hypot(group.position.x - nx, group.position.z - nz);
       if (dist < nearestDist) {
         nearestDist = dist;
         nearestId = n.trackId;
+        nearestPos = [nx, ny, nz];
       }
       const isNear = nearby.current.has(n.trackId);
       // "/audio/sample.mp3"는 실제 파일이 없는 폴백 경로 — 미리듣기 없는 곡을
@@ -115,11 +142,29 @@ export default function KayakCharacter() {
       if (!isNear && dist < PLAY_RADIUS && n.audioUrl !== "/audio/sample.mp3") {
         spatialAudioEngine.registerAndPlay(n.trackId, n.audioUrl, [nx, ny, nz]);
         nearby.current.add(n.trackId);
+        nearbyChanged = true;
       } else if (isNear && dist > STOP_RADIUS) {
         spatialAudioEngine.stop(n.trackId);
         nearby.current.delete(n.trackId);
+        nearbyChanged = true;
       }
     });
+    // 실제로 드나든 트랙이 있을 때만 스토어에 반영 — 매 프레임 새 Set을
+    // 만들어 리렌더를 유발하지 않게.
+    if (nearbyChanged) setNearbyTrackIds(new Set(nearby.current));
+
+    // ── 가장 가까운 부표를 가리키는 화면 각도(HUD 화살표용), 12~15fps로만 ──
+    if (throttledTick) {
+      if (nearestPos) {
+        const kayakNDC = tmpKayakNDC.current.set(group.position.x, group.position.y, group.position.z).project(camera);
+        const targetNDC = tmpTargetNDC.current.set(nearestPos[0], nearestPos[1], nearestPos[2]).project(camera);
+        const dx = targetNDC.x - kayakNDC.x;
+        const dy = targetNDC.y - kayakNDC.y;
+        setNextBuoyScreenAngle((Math.atan2(dx, dy) * 180) / Math.PI);
+      } else {
+        setNextBuoyScreenAngle(null);
+      }
+    }
 
     // ── 스페이스바: 사거리 안 가장 가까운 부표 선택 ──
     if (selectPressedRef.current) {
@@ -131,10 +176,10 @@ export default function KayakCharacter() {
   return (
     <group ref={groupRef} position={[0, 0, 40]}>
       <group ref={hullRef}>
-        {/* 카약 선체 */}
+        {/* 카약 선체 — 사람만 클레이로 남기고 배는 실사 톤(PBR, 카툰 셰이딩/범프 뺌) */}
         <mesh rotation={[Math.PI / 2, 0, 0]}>
           <capsuleGeometry args={[1.1, 5, 4, 8]} />
-          <meshToonMaterial color="#ffb84d" normalMap={clayNormal} normalScale={new THREE.Vector2(0.6, 0.6)} />
+          <meshStandardMaterial color="#ffb84d" roughness={0.4} metalness={0.05} />
         </mesh>
 
         {/* 사람 — 고무찰흙 느낌 (둥근 primitive + 클레이 범프 노멀맵) */}

@@ -24,15 +24,16 @@ function formatTime(sec: number): string {
 export default function ExploreNodeControls({ node }: { node: TrackNode }) {
   const setSelectedTrackId = useExploreStore((s) => s.setSelectedTrackId);
   const layoutPos = useExploreStore((s) => s.waterLayout.get(node.trackId));
+  const addArchivedTrackId = useExploreStore((s) => s.addArchivedTrackId);
+  const alreadyArchived = useExploreStore((s) => s.archivedTrackIds.has(node.trackId));
   const [playback, setPlayback] = useState({ currentTime: 0, duration: 0, paused: true });
   const [archiving, setArchiving] = useState(false);
-  const [archived, setArchived] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const trackId = node.trackId;
   const token = getToken();
+  const archived = alreadyArchived;
 
   useEffect(() => {
-    setArchived(false);
     const tick = () => {
       const state = spatialAudioEngine.getPlaybackState(trackId);
       if (state) setPlayback(state);
@@ -66,7 +67,7 @@ export default function ExploreNodeControls({ node }: { node: TrackNode }) {
           source: "recommend",
         }),
       });
-      if (res.ok) setArchived(true);
+      if (res.ok) addArchivedTrackId(trackId);
     } finally {
       setArchiving(false);
     }

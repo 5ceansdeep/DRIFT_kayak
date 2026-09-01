@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { Html } from "@react-three/drei";
+import { Html, OrbitControls } from "@react-three/drei";
 import { useExploreStore } from "@/store/useExploreStore";
 import { prefetchCovers } from "@/lib/itunesImage";
 import { authHeader } from "@/lib/authClient";
@@ -20,6 +20,7 @@ export default function ExploreScene() {
   const waterLayout = useExploreStore((state) => state.waterLayout);
   const selectedTrackId = useExploreStore((state) => state.selectedTrackId);
   const selectedNode = nodes.find((n) => n.trackId === selectedTrackId) ?? null;
+  const devMode = useExploreStore((state) => state.devMode);
 
   // 장르별 무게중심 — "각 해변마다 다른 장르" 라벨 위치. KayakCharacter도
   // 같은 함수(engine/OceanLayout)로 "지금 있는 구역"을 판정한다.
@@ -48,6 +49,9 @@ export default function ExploreScene() {
           </div>
         </Html>
       ))}
+
+      {/* 개발자 모드: 전체 지역이 어떻게 생겼는지 내려다보는 자유 궤도 카메라 (M 키). */}
+      {devMode && <OrbitControls makeDefault target={[0, 0, 0]} minDistance={20} maxDistance={1500} />}
 
       <SimilarityZoneShells />
       <KayakCharacter />

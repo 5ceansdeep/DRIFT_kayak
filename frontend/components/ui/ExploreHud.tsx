@@ -36,6 +36,8 @@ export default function ExploreHud() {
   const selectedTrackId = useExploreStore((state) => state.selectedTrackId);
   const currentRegion = useExploreStore((state) => state.currentRegion);
   const showRegionToast = useRegionToast(currentRegion);
+  const nextBuoyScreenAngle = useExploreStore((state) => state.nextBuoyScreenAngle);
+  const devMode = useExploreStore((state) => state.devMode);
 
   // 선택된 곡은 3D 씬 안(ExploreNodeControls)이 카드 바로 아래에 컨트롤을
   // 붙여서 담당 — 여기선 hover만 가볍게 표시.
@@ -64,6 +66,22 @@ export default function ExploreHud() {
       {showRegionToast && currentRegion && (
         <div className="drift-panel-in pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-[#0d2b3e] bg-[#eef7fa]/90 px-4 py-1.5 text-[11px] tracking-[0.08em]">
           Region: <span className="font-bold">{currentRegion}</span>
+        </div>
+      )}
+
+      {/* 다음(가장 가까운) 부표를 가리키는 방향 화살표 — 개발자 모드에선 추격 카메라 기준 각도라 의미 없으니 숨김 */}
+      {!devMode && nextBuoyScreenAngle !== null && (
+        <div
+          className="pointer-events-none absolute left-1/2 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full border border-[#0d2b3e] bg-[#eef7fa]/90 text-lg"
+          style={{ bottom: BOTTOM_STACK_HEIGHT + 16, transform: `translateX(-50%) rotate(${nextBuoyScreenAngle}deg)` }}
+        >
+          ↑
+        </div>
+      )}
+
+      {devMode && (
+        <div className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-[#0d2b3e] bg-[#eef7fa]/90 px-4 py-1.5 text-[11px] tracking-[0.08em]">
+          DEV CAM — 드래그로 회전·스크롤로 줌 (M으로 복귀)
         </div>
       )}
 
@@ -105,6 +123,9 @@ export default function ExploreHud() {
         </span>
         <span>
           <span className="mr-1 rounded-full border border-[#0d2b3e]/40 px-1 text-[9px]">CLICK</span>Board
+        </span>
+        <span>
+          <span className="mr-1 rounded-full border border-[#0d2b3e]/40 px-1 text-[9px]">M</span>Dev Cam
         </span>
       </div>
     </div>
