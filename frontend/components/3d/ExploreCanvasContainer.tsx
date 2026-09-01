@@ -19,13 +19,11 @@ export default function ExploreCanvasContainer() {
       <ExploreIntro />
 
       <Canvas
-        // Water가 매 프레임 반사 텍스처를 만들려고 씬을 통째로 한 번 더 렌더함
-        // — dpr을 2까지 올리면 그 비용이 4배가 된다. 1~1.5로 캡.
-        dpr={[1, 1.5]}
+        // 성능 때문에 dpr/안티앨리어싱을 깎았었는데, 진짜 버벅임의 원인은
+        // Rapier(제거됨)였다 — 화질을 다시 정상으로.
+        dpr={[1, 2]}
         camera={{ position: [0, 14, 62], fov: 60, near: 0.1, far: 3000 }}
-        // Water 프래그먼트 셰이더가 이미 무거워서(노이즈 텍스처 4번 샘플링)
-        // 안티앨리어싱까지 얹으면 부담이 커진다 — 꺼서 여유를 만듦.
-        gl={{ antialias: false, alpha: true, powerPreference: "high-performance" }}
+        gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       >
         {/* 고무찰흙 느낌의 카툰 셰이딩(meshToonMaterial)엔 방향광이 있어야
             음영 단이 생긴다. */}
