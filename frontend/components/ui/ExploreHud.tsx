@@ -55,6 +55,9 @@ export default function ExploreHud() {
         <Link href="/twin" className="w-fit opacity-40 hover:opacity-100">
           TWIN →
         </Link>
+        <Link href="/nebula" className="w-fit opacity-40 hover:opacity-100">
+          NEBULA (우주 컨셉) →
+        </Link>
         <div className="opacity-40">{nodes.length > 0 ? nodes.length : "···"}</div>
       </div>
 
