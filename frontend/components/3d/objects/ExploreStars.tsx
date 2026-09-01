@@ -22,38 +22,47 @@ const SPIN_SPEED = 0.5; // LP판처럼 커버가 제자리에서 도는 속도
 // 커버 URL을 three.js 텍스처로 로드하는 훅. drei의 useTexture(Suspense 기반)
 // 대신 직접 로더를 써서, 실패(네트워크 오류·CORS 등)해도 앱 전체가 죽지
 // 않고 그냥 커버 없는 카드(잉크 테두리만)로 조용히 폴백하게 한다.
-function useCoverTexture(url: string | null): THREE.Texture | null {
+//
+// 부표가 한꺼번에(십수~수십 개) 뜨면 iTunes CDN 한 origin에 그만큼 동시
+// CORS 이미지 요청이 몰려서, 하나하나는 금방 끝나도 브라우저의 origin당
+// 동시 연결 제한 때문에 전체는 몇 초~십수 초씩 걸린다("커버가 안 뜬다"는
+// 건 사실 이 대기시간이었다 — 실제론 다 뜨긴 함). lowUrl(80px, 이미 HUD용
+// prefetchCovers가 브라우저 캐시에 데워둔 크기)을 먼저 걸어서 거의 즉시
+// 뭔가 보이게 하고, highUrl(200px, 선명한 버전)이 나중에 도착하면 덮어쓴다.
+function useCoverTexture(lowUrl: string | null, highUrl: string | null): THREE.Texture | null {
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    if (!url) {
-      // url이 없어졌을 때(커버 없는 곡으로 바뀜)만 리셋 — 로더 콜백과 같은
-      // "외부 리소스 로딩 결과 반영" 성격이라 동기 setState를 의도적으로 씀.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!lowUrl && !highUrl) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 외부 리소스 로딩 결과 반영과 같은 성격
       setTexture(null);
       return;
     }
     const loader = new THREE.TextureLoader();
-    loader.load(
-      url,
-      (tex) => {
-        if (cancelled) {
-          tex.dispose();
-          return;
+    const load = (url: string) => {
+      loader.load(
+        url,
+        (tex) => {
+          if (cancelled) {
+            tex.dispose();
+            return;
+          }
+          tex.colorSpace = THREE.SRGBColorSpace;
+          setTexture(tex);
+        },
+        undefined,
+        () => {
+          /* 실패해도 조용히 무시 — 이미 뜬 저해상도가 있으면 그대로 유지 */
         }
-        tex.colorSpace = THREE.SRGBColorSpace;
-        setTexture(tex);
-      },
-      undefined,
-      () => {
-        if (!cancelled) setTexture(null);
-      }
-    );
+      );
+    };
+    if (lowUrl) load(lowUrl);
+    if (highUrl) load(highUrl);
     return () => {
       cancelled = true;
     };
-  }, [url]);
+  }, [lowUrl, highUrl]);
 
   return texture;
 }
@@ -73,8 +82,9 @@ function TrackCard({ node }: { node: TrackNode }) {
   const setHoveredTrackId = useExploreStore((s) => s.setHoveredTrackId);
   const setSelectedTrackId = useExploreStore((s) => s.setSelectedTrackId);
 
-  const coverUrl = node.coverUrl ? iTunesCoverUrl(node.coverUrl, 200) : null;
-  const cover = useCoverTexture(coverUrl);
+  const lowCoverUrl = node.coverUrl ? iTunesCoverUrl(node.coverUrl, 80) : null;
+  const highCoverUrl = node.coverUrl ? iTunesCoverUrl(node.coverUrl, 200) : null;
+  const cover = useCoverTexture(lowCoverUrl, highCoverUrl);
   const layoutPos = useExploreStore((s) => s.waterLayout.get(node.trackId));
   const [wx, wy, wz] = layoutPos ?? waterPosition(node);
 
