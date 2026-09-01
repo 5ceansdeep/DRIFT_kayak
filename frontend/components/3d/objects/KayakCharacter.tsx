@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { RigidBody, CapsuleCollider, type RapierRigidBody } from "@react-three/rapier";
 import * as THREE from "three";
@@ -13,7 +13,7 @@ import { generateNormalMapTexture } from "@/lib/proceduralNormalMap";
 
 const THRUST = 30; // 노 젓는 힘(임펄스) — 관성/감쇠는 RigidBody의 linearDamping이 담당
 const BUOYANCY_K = 7; // 부력 스프링 계수 — 잠긴 깊이에 비례해 밀어 올림
-const CAMERA_OFFSET = new THREE.Vector3(0, 14, 22); // 뒤+위에서 따라가는 3인칭 카메라
+const CAMERA_OFFSET = new THREE.Vector3(0, 20, 11); // 뒤+위에서 따라가는 3인칭 카메라 — 위쪽 비중을 키워 더 둔각으로, 전체 거리는 더 가깝게
 const CAMERA_LERP = 4;
 const PLAY_RADIUS = 34; // 이 안으로 들어오면 재생 시작
 const STOP_RADIUS = 46; // 이 밖으로 나가면 정지 (히스테리시스로 경계 깜빡임 방지)
@@ -48,8 +48,9 @@ export default function KayakCharacter() {
   const nearby = useRef<Set<string>>(new Set());
   const centroids = useMemo(() => genreCentroids(nodes), [nodes]);
   // 점토 표면의 "지문/뭉툭함" 느낌을 내는 범프 노멀맵 — 물결용과 같은 생성기,
-  // 돌기를 더 작고 촘촘하게.
+  // 돌기를 더 작고 촘촘하게. 리마운트 때마다 새로 생기니 언마운트 시 dispose.
   const clayNormal = useMemo(() => generateNormalMapTexture(128, 50, 3, 8, 0.35), []);
+  useEffect(() => () => clayNormal.dispose(), [clayNormal]);
 
   useFrame(({ clock }, delta) => {
     const body = bodyRef.current;

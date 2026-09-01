@@ -10,6 +10,7 @@ function hashString(s: string): number {
 }
 
 const START_CLEARANCE = 14; // 배 출발지점 바로 앞이 곡으로 꽉 차지 않도록 두는 여백
+const RADIUS_SCALE = 1.9; // 부표 간격이 좁아 보여서 전체적으로 더 밀어냄
 
 export function waterPosition(node: {
   trackId: string;
@@ -17,18 +18,21 @@ export function waterPosition(node: {
   similarity: number;
 }): [number, number, number] {
   const genreAngle = ((hashString(node.genre) % 1000) / 1000) * Math.PI * 2;
-  const jitter = ((hashString(node.trackId) % 1000) / 1000 - 0.5) * 0.7; // 같은 장르 안에서도 퍼지게
+  const jitter = ((hashString(node.trackId) % 1000) / 1000 - 0.5) * 0.9; // 같은 장르 안에서도 퍼지게
   const angle = genreAngle + jitter;
-  const radius = radiusForSimilarity(node.similarity) + START_CLEARANCE;
+  // 유사도가 비슷한 곡끼리 반지름이 겹쳐 붙어 보이지 않도록 트랙별로 약간의
+  // 반지름 지터도 섞는다(장르 각도 지터만으론 반지름 방향 겹침을 못 막음).
+  const radialJitter = (hashString(node.trackId + "r") % 1000) / 1000;
+  const radius = radiusForSimilarity(node.similarity) * RADIUS_SCALE + START_CLEARANCE + radialJitter * 18;
   return [Math.cos(angle) * radius, 0, Math.sin(angle) * radius];
 }
 
 export const WATER_RING_RADII = {
-  calm: radiusForSimilarity(1 / 3) + START_CLEARANCE,
-  storm: radiusForSimilarity(-1 / 3) + START_CLEARANCE,
+  calm: radiusForSimilarity(1 / 3) * RADIUS_SCALE + START_CLEARANCE,
+  storm: radiusForSimilarity(-1 / 3) * RADIUS_SCALE + START_CLEARANCE,
 };
 
-export const WATER_MAX_RADIUS = SPHERE_MAX_RADIUS + START_CLEARANCE;
+export const WATER_MAX_RADIUS = SPHERE_MAX_RADIUS * RADIUS_SCALE + START_CLEARANCE;
 
 // 장르 하나 = 색상 하나(해시 기반 hue). 임의의 장르 문자열에도 항상 같은
 // 색이 나오므로 룩업 테이블을 따로 관리할 필요가 없다.
