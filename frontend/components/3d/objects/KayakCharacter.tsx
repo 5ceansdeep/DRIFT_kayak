@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { RigidBody, CapsuleCollider, type RapierRigidBody } from "@react-three/rapier";
 import * as THREE from "three";
 import { useKeyboard } from "@/hooks/useKeyboard";
 import { useExploreStore } from "@/store/useExploreStore";
@@ -11,8 +10,9 @@ import { waterPosition, genreCentroids, nearestGenre } from "@/engine/OceanLayou
 import { waveHeight } from "@/engine/OceanWaves";
 import { generateNormalMapTexture } from "@/lib/proceduralNormalMap";
 
-const THRUST = 30; // 노 젓는 힘(임펄스) — 관성/감쇠는 RigidBody의 linearDamping이 담당
-const BUOYANCY_K = 7; // 부력 스프링 계수 — 잠긴 깊이에 비례해 밀어 올림
+const ACCEL = 34; // 노 젓는 가속도
+const DRAG = 1.6; // 클수록 빨리 감속(마찰/저항) — 놓으면 관성으로 미끄러지다 멈춤
+const MAX_SPEED = 22;
 const CAMERA_OFFSET = new THREE.Vector3(0, 20, 11); // 뒤+위에서 따라가는 3인칭 카메라 — 위쪽 비중을 키워 더 둔각으로, 전체 거리는 더 가깝게
 const CAMERA_LERP = 4;
 // OceanLayout의 RING_STEP(같은 장르 내 최소 간격, 30)보다 작게 잡아야
@@ -20,28 +20,24 @@ const CAMERA_LERP = 4;
 const PLAY_RADIUS = 20; // 이 안으로 들어오면 재생 시작
 const STOP_RADIUS = 28; // 이 밖으로 나가면 정지 (히스테리시스로 경계 깜빡임 방지)
 const SELECT_RADIUS = 24; // 스페이스바로 선택 가능한 최대 거리
-const ANIM_FPS = 13; // 고무찰흙 스톱모션 느낌 — 화면에 보이는 메시만 이 속도로 갱신
+const WAVE_SLOPE_EPS = 1.5;
+const ANIM_FPS = 13; // 고무찰흙 스톱모션 느낌 — 자세(파도 흔들림/노젓기)만 이 속도로 갱신
 
-// 뱃머리/고물/좌현/우현 4점에서 각각 부력을 재서 자연스럽게 피치/롤이 생기게 함.
-const FLOAT_POINTS: [number, number, number][] = [
-  [0, 0, -2.5],
-  [0, 0, 2.5],
-  [-0.9, 0, 0],
-  [0.9, 0, 0],
-];
-
-// ponytail: Cannon/Rapier 급 완전한 유체 시뮬레이션은 아님 — 4점 부력 스프링 +
-// 감쇠로 "물에 뜬 것 같은" 반응을 흉내내는 수준. 파도 함수(OceanWaves)는
-// 물 셰이더와 공유해서 시각적으로는 "같은 파도"를 보는 것처럼 맞춘다.
+// ponytail: @react-three/rapier(진짜 물리 엔진)를 한 번 붙여봤는데, Physics
+// 프로바이더를 마운트하는 것만으로(RigidBody 하나도 없이) WebGL 컨텍스트가
+// 죽는 버그가 있었다(격리 테스트로 확인 — Physics 빼면 멀쩡, 넣으면 항상
+// 죽음. rapier_wasm3d.js의 wasm-bindgen init 호출 방식이 deprecated라는
+// 경고가 같이 뜨는 걸로 봐서 @react-three/rapier <-> rapier3d-compat 버전
+// 궁합 문제로 보인다). 그래서 진짜 유체역학 대신 속도+가속+감쇠(drag)로
+// "관성 있게 미끄러지는" 느낌만 흉내내고, 기울기는 파도 함수의 기울기
+// (유한차분)를 그대로 읽어서 붙이는 이전 방식으로 되돌렸다 — 안정적이고
+// 체감상 차이도 크지 않음. 실제 파도 충돌/부표 충돌도 없음.
 export default function KayakCharacter() {
-  const bodyRef = useRef<RapierRigidBody>(null!);
-  const visualRef = useRef<THREE.Group>(null!); // 실제 렌더되는 메시 — 물리 바디와 분리해서 스톱모션 프레임레이트로만 갱신
+  const groupRef = useRef<THREE.Group>(null!);
+  const hullRef = useRef<THREE.Group>(null!); // 파도 흔들림(위치/롤/피치) — 스톱모션 프레임레이트로 갱신
   const paddleRef = useRef<THREE.Group>(null!);
+  const velocity = useRef(new THREE.Vector3());
   const animAcc = useRef(0);
-  const tmpPoint = useRef(new THREE.Vector3());
-  const tmpQuat = useRef(new THREE.Quaternion());
-  const tmpEuler = useRef(new THREE.Euler(0, 0, 0, "YXZ"));
-
   const { pressed, selectPressedRef } = useKeyboard();
   const { camera } = useThree();
   const nodes = useExploreStore((s) => s.nodes);
@@ -56,79 +52,66 @@ export default function KayakCharacter() {
   useEffect(() => () => clayNormal.dispose(), [clayNormal]);
 
   useFrame(({ clock }, delta) => {
-    const body = bodyRef.current;
-    if (!body) return;
+    const group = groupRef.current;
+    if (!group) return;
     const t = clock.getElapsedTime();
-    const pos = body.translation();
-    const rot = body.rotation();
 
-    // ── 추진력: WASD/방향키 → 임펄스 ──
+    // ── 이동: 고정 월드축 기준 전후좌우 + 관성(가속/감쇠) ──
     const input = new THREE.Vector3(
       (pressed.current.right ? 1 : 0) - (pressed.current.left ? 1 : 0),
       0,
       (pressed.current.back ? 1 : 0) - (pressed.current.forward ? 1 : 0)
     );
     const moving = input.lengthSq() > 0;
-    if (moving) {
-      input.normalize().multiplyScalar(THRUST * delta);
-      body.applyImpulse({ x: input.x, y: 0, z: input.z }, true);
+    if (moving) velocity.current.addScaledVector(input.normalize(), ACCEL * delta);
+    velocity.current.multiplyScalar(Math.max(0, 1 - DRAG * delta));
+    if (velocity.current.length() > MAX_SPEED) velocity.current.setLength(MAX_SPEED);
+    group.position.addScaledVector(velocity.current, delta);
+    if (velocity.current.lengthSq() > 0.3) {
+      const heading = Math.atan2(velocity.current.x, velocity.current.z);
+      group.rotation.y = THREE.MathUtils.damp(group.rotation.y, heading, 6, delta);
     }
 
-    // ── 부력: 4점에서 각각 수면 아래로 잠긴 만큼 위로 미는 힘 → 자연스러운 피치/롤 ──
-    const bodyQuat = tmpQuat.current.set(rot.x, rot.y, rot.z, rot.w);
-    FLOAT_POINTS.forEach(([lx, ly, lz]) => {
-      const world = tmpPoint.current.set(lx, ly, lz).applyQuaternion(bodyQuat);
-      world.x += pos.x;
-      world.y += pos.y;
-      world.z += pos.z;
-      const waterY = waveHeight(world.x, world.z, t);
-      const submersion = waterY - world.y;
-      if (submersion > 0) {
-        body.applyImpulseAtPoint(
-          { x: 0, y: submersion * BUOYANCY_K * delta, z: 0 },
-          { x: world.x, y: world.y, z: world.z },
-          true
-        );
-      }
-    });
-
-    // ── 3인칭 추격 카메라 (실제 물리 위치를 매 프레임 부드럽게 따라감) ──
-    camera.position.lerp(
-      new THREE.Vector3(pos.x, pos.y, pos.z).add(CAMERA_OFFSET),
-      Math.min(1, CAMERA_LERP * delta)
-    );
-    camera.lookAt(pos.x, pos.y + 2, pos.z);
-
-    // ── 화면에 보이는 메시는 12~15fps로만 물리 결과를 복사 — 고무찰흙 스톱모션 ──
+    // ── 자세(파도에 뜬 느낌)는 12~15fps로만 갱신 — 고무찰흙 스톱모션 미학 ──
     animAcc.current += delta;
-    if (animAcc.current >= 1 / ANIM_FPS && visualRef.current) {
+    if (animAcc.current >= 1 / ANIM_FPS) {
       animAcc.current = 0;
-      const euler = tmpEuler.current.setFromQuaternion(bodyQuat, "YXZ");
-      const lv = body.linvel();
-      if (lv.x * lv.x + lv.z * lv.z > 0.3) euler.y = Math.atan2(lv.x, lv.z);
-      visualRef.current.position.set(pos.x, pos.y, pos.z);
-      visualRef.current.quaternion.setFromEuler(euler);
+      const gx = group.position.x;
+      const gz = group.position.z;
+      const h = waveHeight(gx, gz, t);
+      const hx = waveHeight(gx + WAVE_SLOPE_EPS, gz, t);
+      const hz = waveHeight(gx, gz + WAVE_SLOPE_EPS, t);
+      if (hullRef.current) {
+        hullRef.current.position.y = h * 0.5;
+        hullRef.current.rotation.z = -((hx - h) / WAVE_SLOPE_EPS) * 1.5 - velocity.current.x * 0.01;
+        hullRef.current.rotation.x = ((hz - h) / WAVE_SLOPE_EPS) * 1.5 + velocity.current.z * 0.01;
+      }
       if (paddleRef.current) {
         paddleRef.current.rotation.z = moving ? Math.sin(t * 6) * 0.5 : Math.sin(t * 1.2) * 0.06;
       }
     }
 
+    // ── 3인칭 추격 카메라 (부드럽게, 매 프레임) ──
+    camera.position.lerp(group.position.clone().add(CAMERA_OFFSET), Math.min(1, CAMERA_LERP * delta));
+    camera.lookAt(group.position.x, group.position.y + 2, group.position.z);
+
     // ── 지금 있는 장르 구역 갱신 ──
-    setCurrentRegion(nearestGenre(pos.x, pos.z, centroids));
+    setCurrentRegion(nearestGenre(group.position.x, group.position.z, centroids));
 
     // ── 리스너 위치 + 근접 시 자동 재생/정지 ──
-    spatialAudioEngine.updateListenerPosition([pos.x, pos.y, pos.z]);
+    spatialAudioEngine.updateListenerPosition([group.position.x, group.position.y, group.position.z]);
     let nearestId: string | null = null;
     let nearestDist = Infinity;
     nodes.forEach((n) => {
       const [nx, ny, nz] = waterLayout.get(n.trackId) ?? waterPosition(n);
-      const dist = Math.hypot(pos.x - nx, pos.z - nz);
+      const dist = Math.hypot(group.position.x - nx, group.position.z - nz);
       if (dist < nearestDist) {
         nearestDist = dist;
         nearestId = n.trackId;
       }
       const isNear = nearby.current.has(n.trackId);
-      // "/audio/sample.mp3"는 실제 파일이 없는 폴백 경로 — 헛 요청 방지.
+      // "/audio/sample.mp3"는 실제 파일이 없는 폴백 경로 — 미리듣기 없는 곡을
+      // 근접할 때마다 헛 요청을 쏘지 않도록 건너뛴다.
       if (!isNear && dist < PLAY_RADIUS && n.audioUrl !== "/audio/sample.mp3") {
         spatialAudioEngine.registerAndPlay(n.trackId, n.audioUrl, [nx, ny, nz]);
         nearby.current.add(n.trackId);
@@ -146,21 +129,8 @@ export default function KayakCharacter() {
   });
 
   return (
-    <>
-      {/* 물리 전용 — 보이지 않음. 요(yaw)는 잠가서 부력 토크로 계속 빙빙 도는 걸 방지 */}
-      <RigidBody
-        ref={bodyRef}
-        colliders={false}
-        position={[0, 1, 40]}
-        linearDamping={2.2}
-        angularDamping={2.8}
-        enabledRotations={[true, false, true]}
-      >
-        <CapsuleCollider args={[2.5, 1.1]} rotation={[Math.PI / 2, 0, 0]} />
-      </RigidBody>
-
-      {/* 실제로 보이는 부분 — 위 물리 바디와 분리, 스톱모션 프레임레이트로만 따라감 */}
-      <group ref={visualRef} position={[0, 1, 40]}>
+    <group ref={groupRef} position={[0, 0, 40]}>
+      <group ref={hullRef}>
         {/* 카약 선체 */}
         <mesh rotation={[Math.PI / 2, 0, 0]}>
           <capsuleGeometry args={[1.1, 5, 4, 8]} />
@@ -195,6 +165,6 @@ export default function KayakCharacter() {
           </group>
         </group>
       </group>
-    </>
+    </group>
   );
 }

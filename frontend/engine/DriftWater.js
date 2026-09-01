@@ -9,7 +9,6 @@
 import {
 	Color,
 	FrontSide,
-	HalfFloatType,
 	Matrix4,
 	Mesh,
 	PerspectiveCamera,
@@ -93,7 +92,12 @@ class Water extends Mesh {
 
 		const mirrorCamera = new PerspectiveCamera();
 
-		const renderTarget = new WebGLRenderTarget( textureWidth, textureHeight, { type: HalfFloatType } );
+		// [DRIFT PATCH] 원본은 HalfFloatType(16비트 부동소수 프레임버퍼)을 무조건
+		// 씀 — 모든 GPU/드라이버가 그걸 렌더 타겟으로 지원하진 않는다(특히
+		// 내장 그래픽/소프트웨어 렌더러). 지원 안 되면 프레임버퍼가 깨진 채로
+		// 매 프레임 렌더를 시도하다 WebGL 컨텍스트 자체가 죽는 걸로 보인다.
+		// 반사는 HDR이 필요 없으니 기본(8비트, UnsignedByteType)으로.
+		const renderTarget = new WebGLRenderTarget( textureWidth, textureHeight );
 
 		const mirrorShader = {
 

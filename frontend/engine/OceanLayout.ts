@@ -20,8 +20,10 @@ const SECTOR_FAN = 0.22; // 같은 장르 안에서도 완전히 일직선이 �
 type LayoutNode = { trackId: string; genre: string; similarity: number };
 
 // 노드 전체를 한 번에 받아서 장르별로 묶고, 그 안에서 유사도 높은 순으로
-// 안쪽부터 바깥쪽으로 늘어놓는다 — 각 곡마다 최소 RING_STEP만큼 떨어지는
-// 게 보장돼서, 비슷한 유사도 곡들이 붙어 보이는 문제가 안 생긴다.
+// 안쪽부터 바깥쪽으로 늘어놓는다. 반지름 증가폭은 i에 비례(선형)가 아니라
+// sqrt(i)에 비례하게 해서 — 같은 장르 곡이 아주 많아져도(폴백 mock
+// 데이터처럼) 바깥쪽으로 무한정 멀어지지 않고, 그러면서도 여전히 최소
+// 간격은 보장된다(해바라기씨 배치와 같은 원리 — 면적당 밀도를 고르게 유지).
 export function computeWaterLayout(nodes: LayoutNode[]): Map<string, [number, number, number]> {
   const byGenre = new Map<string, LayoutNode[]>();
   nodes.forEach((n) => {
@@ -37,7 +39,7 @@ export function computeWaterLayout(nodes: LayoutNode[]): Map<string, [number, nu
     sorted.forEach((n, i) => {
       const fan = ((hashString(n.trackId) % 1000) / 1000 - 0.5) * SECTOR_FAN;
       const angle = sectorAngle + fan;
-      const radius = radiusForSimilarity(n.similarity) * RADIUS_SCALE + START_CLEARANCE + i * RING_STEP;
+      const radius = radiusForSimilarity(n.similarity) * RADIUS_SCALE + START_CLEARANCE + Math.sqrt(i) * RING_STEP;
       layout.set(n.trackId, [Math.cos(angle) * radius, 0, Math.sin(angle) * radius]);
     });
   });

@@ -5,9 +5,12 @@ import { radiusForSimilarity } from "@/engine/SimilarityZones";
 
 // 실 데이터 연동: backend GET /songs/recommend/full(코사인 유사도)를 우선 시도.
 // 백엔드가 꺼져 있거나 후보곡이 없으면(아카이브 전, taste_vector 없음 등)
-// mock 600개로 자동 폴백 — docs/tech-spec.md 2.3/3.6 참고.
+// mock으로 자동 폴백 — docs/tech-spec.md 2.3/3.6 참고.
+// ponytail: 예전엔 600개였는데, 실 데이터 쪽을 이미 40개로 캡해놨어서(위 slice)
+// 폴백만 600개면 개별 메시 600개(카드+텍스처+useFrame 600번)로 렌더가
+// 사실상 멈춘 것처럼 느려진다 — 실 데이터와 같은 규모로 맞춤.
 const GENRES = ["Noise Rock", "Free Jazz", "Drone", "IDM", "Field Recording", "Krautrock"];
-const NODE_COUNT = 600;
+const NODE_COUNT = 40;
 
 function randomUnitVector(): [number, number, number] {
   // 구면상 균등 분포 (Marsaglia 방법)

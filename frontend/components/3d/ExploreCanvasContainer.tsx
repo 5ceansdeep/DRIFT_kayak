@@ -1,7 +1,6 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
-import { Physics } from "@react-three/rapier";
 import ExploreScene from "./scenes/ExploreScene";
 import ExploreHud from "../ui/ExploreHud";
 import ExploreIntro from "../ui/ExploreIntro";
@@ -32,10 +31,9 @@ export default function ExploreCanvasContainer() {
             음영 단이 생긴다. */}
         <ambientLight intensity={0.9} />
         <directionalLight position={[60, 100, 40]} intensity={0.8} />
-        {/* 카약(KayakCharacter)만 RigidBody를 씀 — 부표/물은 물리 대상 아님 */}
-        <Physics gravity={[0, -9.81, 0]}>
-          <ExploreScene />
-        </Physics>
+        {/* @react-three/rapier(Physics)는 뺐다 — WebGL 컨텍스트를 죽이는
+            버그가 있었음(KayakCharacter.tsx 상단 주석 참고). */}
+        <ExploreScene />
       </Canvas>
     </div>
   );
