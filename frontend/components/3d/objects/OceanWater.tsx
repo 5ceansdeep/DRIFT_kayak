@@ -1,79 +1,67 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { Water } from "three/examples/jsm/objects/Water.js";
 import { useExploreStore } from "@/store/useExploreStore";
-import { WAVE_GLSL } from "@/engine/OceanWaves";
 import { genreColor } from "@/engine/OceanLayout";
-
-// 프랙탈 노이즈 SVG를 범프맵으로 써서 잔물결(고주파)을 흉내낸다 — 기존
-// 코드베이스의 .drift-grain(app/drift-theme.css)과 같은 트릭.
-const RIPPLE_DATA_URL =
-  "data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E";
+import { generateNormalMapTexture } from "@/lib/proceduralNormalMap";
 
 const DEFAULT_COLOR = new THREE.Color("#0f5e82");
 
-// ponytail: THREE.Water(진짜 반사/굴절 SSR)까진 안 씀 — MeshStandardMaterial의
-// onBeforeCompile로 저주파 파도(WAVE_GLSL, KayakCharacter와 공유하는 수식)를
-// 버텍스에 얹고, 범프맵(고주파 잔물결)+낮은 roughness로 "그럴듯한 반짝임"만
-// 흉내낸다. 진짜 리얼하게 필요해지면 three/addons/objects/Water.js로 교체.
+// 진짜 반사(THREE.Water — 미러 카메라로 씬을 렌더한 텍스처를 수면에 비춤).
+// 노멀맵은 외부 텍스처 파일 없이 캔버스로 직접 생성(lib/proceduralNormalMap).
+// ponytail: Water는 "평평한 거울" 기법이라 버텍스로 진짜 굴곡진 파도를 만들진
+// 않는다 — 지오메트리 파도(KayakCharacter/ExploreStars가 쓰는 waveHeight)와는
+// 시각적으로 분리돼 있음(둘 다 애니메이션은 되니 위화감은 적다). 완전히 하나로
+// 합치려면 굴곡진 반사면(planar reflection이 아닌 스크린스페이스 반사)이
+// 필요한데 그건 비용 대비 효과가 낮아 보류.
 export default function OceanWater() {
-  const materialRef = useRef<THREE.MeshStandardMaterial>(null!);
-  const textureRef = useRef<THREE.Texture | null>(null);
-  const uniformsRef = useRef<{ uTime: { value: number } } | null>(null);
+  const waterRef = useRef<Water | null>(null);
+  const { scene, camera } = useThree();
   const currentRegion = useExploreStore((s) => s.currentRegion);
   const targetColor = useRef(DEFAULT_COLOR.clone());
 
   useEffect(() => {
-    const tex = new THREE.TextureLoader().load(RIPPLE_DATA_URL);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(24, 24);
-    textureRef.current = tex;
+    const geometry = new THREE.PlaneGeometry(4000, 4000);
+    const waterNormals = generateNormalMapTexture();
 
-    const mat = materialRef.current;
-    if (!mat) return;
-    mat.bumpMap = tex;
-    mat.onBeforeCompile = (shader) => {
-      const uniforms = { uTime: { value: 0 } };
-      uniformsRef.current = uniforms;
-      shader.uniforms.uTime = uniforms.uTime;
-      shader.vertexShader =
-        `uniform float uTime;\n${WAVE_GLSL}\n` +
-        shader.vertexShader.replace(
-          "#include <begin_vertex>",
-          "#include <begin_vertex>\n\ttransformed.z += waveHeight(transformed.x, -transformed.y, uTime);"
-        );
+    const water = new Water(geometry, {
+      textureWidth: 512,
+      textureHeight: 512,
+      waterNormals,
+      sunDirection: new THREE.Vector3(60, 100, 40).normalize(),
+      sunColor: 0xffffff,
+      waterColor: DEFAULT_COLOR.getHex(),
+      distortionScale: 3.2,
+      fog: !!scene.fog,
+    });
+    water.rotation.x = -Math.PI / 2;
+    water.material.transparent = true;
+    water.material.uniforms.alpha.value = 0.92;
+    scene.add(water);
+    waterRef.current = water;
+
+    return () => {
+      scene.remove(water);
+      geometry.dispose();
+      waterNormals.dispose();
+      water.material.dispose();
     };
-    mat.needsUpdate = true;
-  }, []);
+  }, [scene]);
 
   useEffect(() => {
     targetColor.current = currentRegion ? new THREE.Color(genreColor(currentRegion)) : DEFAULT_COLOR.clone();
   }, [currentRegion]);
 
   useFrame((_, delta) => {
-    if (uniformsRef.current) uniformsRef.current.uTime.value += delta;
-    const tex = textureRef.current;
-    if (tex) {
-      tex.offset.x += delta * 0.015;
-      tex.offset.y += delta * 0.01;
-    }
-    materialRef.current?.color.lerp(targetColor.current, Math.min(1, delta * 1.2));
+    const water = waterRef.current;
+    if (!water) return;
+    water.material.uniforms.time.value += delta * 0.6;
+    (water.material.uniforms.eye.value as THREE.Vector3).copy(camera.position);
+    (water.material.uniforms.waterColor.value as THREE.Color).lerp(targetColor.current, Math.min(1, delta * 1.2));
   });
 
-  return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-      <planeGeometry args={[3000, 3000, 180, 180]} />
-      <meshStandardMaterial
-        ref={materialRef}
-        color={DEFAULT_COLOR}
-        roughness={0.2}
-        metalness={0.25}
-        bumpScale={0.6}
-        transparent
-        opacity={0.94}
-      />
-    </mesh>
-  );
+  return null;
 }
