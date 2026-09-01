@@ -22,12 +22,38 @@ function randomUnitVector(): [number, number, number] {
   return [x / d, y / d, z / d];
 }
 
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+// 같은 장르 곡은 원점(내 라이브러리) 기준 같은 방향으로 몰아서 "장르별 성단"처럼
+// 뭉치게 한다. 장르 문자열을 시드로 쓴 고정 방향 + 약간의 랜덤 지터.
+function genreClusterDirection(genre: string): [number, number, number] {
+  const h = hashString(genre);
+  const theta = ((h % 1000) / 1000) * Math.PI * 2;
+  const phi = (((h >>> 10) % 1000) / 1000) * Math.PI;
+  const bx = Math.sin(phi) * Math.cos(theta);
+  const by = Math.cos(phi);
+  const bz = Math.sin(phi) * Math.sin(theta);
+
+  const JITTER = 0.35;
+  const [jx, jy, jz] = randomUnitVector();
+  const x = bx + jx * JITTER;
+  const y = by + jy * JITTER;
+  const z = bz + jz * JITTER;
+  const len = Math.sqrt(x * x + y * y + z * z) || 1;
+  return [x / len, y / len, z / len];
+}
+
 function generateMockNodes(): TrackNode[] {
   const nodes: TrackNode[] = [];
   for (let i = 0; i < NODE_COUNT; i++) {
     const similarity = Math.random() * 2 - 1; // -1 ~ 1
     const radius = radiusForSimilarity(similarity);
-    const [ux, uy, uz] = randomUnitVector();
+    const genre = GENRES[i % GENRES.length];
+    const [ux, uy, uz] = genreClusterDirection(genre);
 
     nodes.push({
       trackId: `exp-track-${i}`,
@@ -39,7 +65,7 @@ function generateMockNodes(): TrackNode[] {
         Date.now() - Math.random() * 180 * 24 * 3600 * 1000
       ).toISOString(),
       audioUrl: "/audio/sample.mp3",
-      genre: GENRES[i % GENRES.length],
+      genre,
     });
   }
   return nodes;
@@ -58,9 +84,10 @@ export async function GET(request: Request) {
     }
 
     const nodes: TrackNode[] = candidates.map((c) => {
-      // recommend 결과엔 3D 위치가 없다 — 방향은 무작위, 반지름만 실제 유사도로 결정.
+      // recommend 결과엔 3D 위치가 없다 — 반지름은 실제 유사도, 방향은 장르 클러스터.
       const radius = radiusForSimilarity(Math.max(-1, Math.min(1, c.similarity)));
-      const [ux, uy, uz] = randomUnitVector();
+      const genre = c.genreTags[0] ?? "Unknown";
+      const [ux, uy, uz] = genreClusterDirection(genre);
 
       return {
         trackId: c.id,
@@ -70,7 +97,7 @@ export async function GET(request: Request) {
         similarity: c.similarity,
         lastPlayedAt: new Date().toISOString(),
         audioUrl: c.previewUrl ?? "/audio/sample.mp3",
-        genre: c.genreTags[0] ?? "Unknown",
+        genre,
         coverUrl: c.coverUrl,
       };
     });

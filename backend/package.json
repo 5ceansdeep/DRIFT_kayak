@@ -6,8 +6,9 @@
   "scripts": {
     "predev": "node scripts/setup-db.js",
     "dev": "nest start --watch",
+    "postinstall": "prisma generate",
     "build": "nest build",
-    "start": "node dist/main.js",
+    "start": "prisma migrate deploy && node dist/main.js",
     "db:start": "node scripts/setup-db.js",
     "db:stop": "prisma dev stop default"
   },

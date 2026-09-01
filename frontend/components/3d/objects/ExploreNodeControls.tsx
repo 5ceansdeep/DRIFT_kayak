@@ -74,7 +74,9 @@ export default function ExploreNodeControls({ node }: { node: TrackNode }) {
     <Html position={node.position3D} center style={{ pointerEvents: "none" }}>
       <div
         className="drift-panel-in pointer-events-auto flex w-56 flex-col items-center gap-2 border border-black bg-paper/90 px-3 py-2 font-mono text-black backdrop-blur-sm"
-        style={{ transform: "translateY(64px)" }}
+        // ponytail: 확대된 카드 크기(CARD_SIZE*SELECT_SCALE, ExploreStars.tsx)에 맞춘
+        // 고정 오프셋. 그 값들이 커지면 여기도 같이 늘려야 함 — 동적 계산은 과함.
+        style={{ transform: "translateY(150px)" }}
       >
         <div className="flex w-full items-center gap-2">
           <button
