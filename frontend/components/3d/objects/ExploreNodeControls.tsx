@@ -23,6 +23,7 @@ function formatTime(sec: number): string {
 // 카메라가 fly-to 애니메이션 중이어도 항상 카드 바로 아래를 따라간다.
 export default function ExploreNodeControls({ node }: { node: TrackNode }) {
   const setSelectedTrackId = useExploreStore((s) => s.setSelectedTrackId);
+  const layoutPos = useExploreStore((s) => s.waterLayout.get(node.trackId));
   const [playback, setPlayback] = useState({ currentTime: 0, duration: 0, paused: true });
   const [archiving, setArchiving] = useState(false);
   const [archived, setArchived] = useState(false);
@@ -72,7 +73,7 @@ export default function ExploreNodeControls({ node }: { node: TrackNode }) {
   };
 
   return (
-    <Html position={waterPosition(node)} center style={{ pointerEvents: "none" }}>
+    <Html position={layoutPos ?? waterPosition(node)} center style={{ pointerEvents: "none" }}>
       <div
         className="drift-panel-in pointer-events-auto flex w-56 flex-col items-center gap-2 rounded-2xl border border-[#0d2b3e] bg-[#eef7fa]/90 px-3 py-2 font-mono text-[#0d2b3e] backdrop-blur-sm"
         // ponytail: 부표 카드 크기(CARD_SIZE*SELECT_SCALE, ExploreStars.tsx)에 맞춘

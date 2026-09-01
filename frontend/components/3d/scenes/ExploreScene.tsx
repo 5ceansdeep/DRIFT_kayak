@@ -18,12 +18,13 @@ export default function ExploreScene() {
   const setNodes = useExploreStore((state) => state.setNodes);
   const nodeCount = useExploreStore((state) => state.nodes.length);
   const nodes = useExploreStore((state) => state.nodes);
+  const waterLayout = useExploreStore((state) => state.waterLayout);
   const selectedTrackId = useExploreStore((state) => state.selectedTrackId);
   const selectedNode = nodes.find((n) => n.trackId === selectedTrackId) ?? null;
 
   // 장르별 무게중심 — "각 해변마다 다른 장르" 라벨 위치. KayakCharacter도
   // 같은 함수(engine/OceanLayout)로 "지금 있는 구역"을 판정한다.
-  const genreCentroids = useMemo(() => computeGenreCentroids(nodes), [nodes]);
+  const genreCentroids = useMemo(() => computeGenreCentroids(nodes, waterLayout), [nodes, waterLayout]);
 
   useEffect(() => {
     if (nodeCount > 0) return;

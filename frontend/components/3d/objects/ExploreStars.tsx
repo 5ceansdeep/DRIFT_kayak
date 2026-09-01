@@ -75,7 +75,8 @@ function TrackCard({ node }: { node: TrackNode }) {
 
   const coverUrl = node.coverUrl ? iTunesCoverUrl(node.coverUrl, 200) : null;
   const cover = useCoverTexture(coverUrl);
-  const [wx, wy, wz] = waterPosition(node);
+  const layoutPos = useExploreStore((s) => s.waterLayout.get(node.trackId));
+  const [wx, wy, wz] = layoutPos ?? waterPosition(node);
 
   useFrame(({ clock }, delta) => {
     const target = isSelected ? SELECT_SCALE : hovered ? HOVER_SCALE : 1;

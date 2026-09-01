@@ -15,9 +15,11 @@ const THRUST = 30; // 노 젓는 힘(임펄스) — 관성/감쇠는 RigidBody�
 const BUOYANCY_K = 7; // 부력 스프링 계수 — 잠긴 깊이에 비례해 밀어 올림
 const CAMERA_OFFSET = new THREE.Vector3(0, 20, 11); // 뒤+위에서 따라가는 3인칭 카메라 — 위쪽 비중을 키워 더 둔각으로, 전체 거리는 더 가깝게
 const CAMERA_LERP = 4;
-const PLAY_RADIUS = 34; // 이 안으로 들어오면 재생 시작
-const STOP_RADIUS = 46; // 이 밖으로 나가면 정지 (히스테리시스로 경계 깜빡임 방지)
-const SELECT_RADIUS = 40; // 스페이스바로 선택 가능한 최대 거리
+// OceanLayout의 RING_STEP(같은 장르 내 최소 간격, 30)보다 작게 잡아야
+// 인접한 두 부표 사거리가 겹쳐서 동시에 재생되는 일이 없다.
+const PLAY_RADIUS = 20; // 이 안으로 들어오면 재생 시작
+const STOP_RADIUS = 28; // 이 밖으로 나가면 정지 (히스테리시스로 경계 깜빡임 방지)
+const SELECT_RADIUS = 24; // 스페이스바로 선택 가능한 최대 거리
 const ANIM_FPS = 13; // 고무찰흙 스톱모션 느낌 — 화면에 보이는 메시만 이 속도로 갱신
 
 // 뱃머리/고물/좌현/우현 4점에서 각각 부력을 재서 자연스럽게 피치/롤이 생기게 함.
@@ -43,10 +45,11 @@ export default function KayakCharacter() {
   const { pressed, selectPressedRef } = useKeyboard();
   const { camera } = useThree();
   const nodes = useExploreStore((s) => s.nodes);
+  const waterLayout = useExploreStore((s) => s.waterLayout);
   const setSelectedTrackId = useExploreStore((s) => s.setSelectedTrackId);
   const setCurrentRegion = useExploreStore((s) => s.setCurrentRegion);
   const nearby = useRef<Set<string>>(new Set());
-  const centroids = useMemo(() => genreCentroids(nodes), [nodes]);
+  const centroids = useMemo(() => genreCentroids(nodes, waterLayout), [nodes, waterLayout]);
   // 점토 표면의 "지문/뭉툭함" 느낌을 내는 범프 노멀맵 — 물결용과 같은 생성기,
   // 돌기를 더 작고 촘촘하게. 리마운트 때마다 새로 생기니 언마운트 시 dispose.
   const clayNormal = useMemo(() => generateNormalMapTexture(128, 50, 3, 8, 0.35), []);
@@ -118,7 +121,7 @@ export default function KayakCharacter() {
     let nearestId: string | null = null;
     let nearestDist = Infinity;
     nodes.forEach((n) => {
-      const [nx, ny, nz] = waterPosition(n);
+      const [nx, ny, nz] = waterLayout.get(n.trackId) ?? waterPosition(n);
       const dist = Math.hypot(pos.x - nx, pos.z - nz);
       if (dist < nearestDist) {
         nearestDist = dist;
