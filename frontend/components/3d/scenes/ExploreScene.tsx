@@ -9,7 +9,6 @@ import { genreCentroids as computeGenreCentroids } from "@/engine/OceanLayout";
 import ExploreStars from "../objects/ExploreStars";
 import ExploreNodeControls from "../objects/ExploreNodeControls";
 import SimilarityZoneShells from "../objects/SimilarityZoneShells";
-import SerendipityComet from "../objects/SerendipityComet";
 import OceanWater from "../objects/OceanWater";
 import KayakCharacter from "../objects/KayakCharacter";
 import type { TrackNode } from "@/types";
@@ -53,7 +52,6 @@ export default function ExploreScene() {
       <SimilarityZoneShells />
       <KayakCharacter />
       <ExploreStars nodes={nodes} />
-      <SerendipityComet />
       {selectedNode && <ExploreNodeControls node={selectedNode} />}
     </>
   );
